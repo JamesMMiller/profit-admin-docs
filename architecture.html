@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>C4 diagrams — Our Tech estate</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;650&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="assets/site.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="top">
+        <a class="brand" href="index.html">
+          <strong>Our Tech estate</strong>
+          <span>Context and architecture</span>
+        </a>
+        <nav class="links">
+          <a href="index.html">Home</a>
+          <a href="architecture.html" aria-current="page">C4 diagrams</a>
+          <a href="start.html">Onboarding</a>
+          <button type="button" class="btn" data-theme-toggle>Theme</button>
+        </nav>
+      </header>
+
+      <h1>C4 diagrams</h1>
+      <p class="lede">
+        Start at the estate, then zoom into Profit Admin.
+        C4 here means Context (people and other systems), Container (running pieces),
+        then Component (the important parts inside one piece).
+        Read the caption under each picture before the boxes.
+      </p>
+
+      <h2>0. Context — the estate</h2>
+      <div class="figure">
+        <pre class="mermaid">
+flowchart LR
+  shopper["UK shopper"]
+  james["James / Cursor"]
+  store["Shopify store"]
+  mail["hello@ + track-proxy"]
+  ads["Meta ads"]
+  desk["Profit Admin"]
+  suppliers["CJ / DSers / Alibaba"]
+  shopper --> ads --> store
+  shopper --> store
+  shopper --> mail
+  store --> suppliers
+  mail --> suppliers
+  james --> desk
+  james --> store
+  james --> ads
+  desk --> store
+  desk --> ads
+  desk --> suppliers
+        </pre>
+      </div>
+      <p class="caption">
+        The estate is the shop plus the back office. Profit Admin is one box:
+        it reads money and writes decisions. It does not serve the storefront
+        or hide the CJ tracking key — that is track-proxy.
+      </p>
+
+      <h2>1. Context — who talks to Profit Admin</h2>
+      <div class="figure">
+        <pre class="mermaid">
+flowchart LR
+  operator["Store operator\nreads P and L and decisions"]
+  agent["Cursor agent\nOAuth machine API"]
+  access["Cloudflare Access\nis this email allowed in?"]
+  pa["Profit Admin\nhosted ops desk"]
+  shopify["Shopify\norders and catalog"]
+  meta["Meta Ads\nspend and purchases"]
+  cj["CJ Dropshipping\nlanded COGS"]
+  operator --> access --> pa
+  agent --> pa
+  pa --> shopify
+  pa --> meta
+  pa --> cj
+        </pre>
+      </div>
+      <p class="caption">
+        Access only answers “may this email reach the app?”.
+        Membership in an organisation still comes from Profit Admin itself.
+        Agents never log in as a human — they use an API key from the desk API page.
+      </p>
+
+      <h2>2. Containers — the running pieces</h2>
+      <div class="figure">
+        <pre class="mermaid">
+flowchart TB
+  operator["Operator in a browser"]
+  subgraph cloudflare [Cloudflare]
+    desk["React desk"]
+    worker["Gateway Worker\nauth, orgs, decisions, proxy"]
+    d1[("D1\nusers, orgs, keys, decisions")]
+    hub["DeskHub\nlive clock pings"]
+    engine["Engine\nPython FastAPI, P and L"]
+    disk[("Org files\nsnapshots and caches")]
+  end
+  operator --> desk --> worker
+  worker --> d1
+  worker --> hub
+  worker --> engine
+  engine --> disk
+        </pre>
+      </div>
+      <p class="caption">
+        The Worker is the front door. D1 is durable (it survives a Container sleep).
+        Engine disk is not — that is why decisions moved off markdown files.
+        P&amp;L still lives in Python. Do not reimplement it in the Worker.
+      </p>
+
+      <h2>3. Components — inside the gateway</h2>
+      <div class="figure">
+        <pre class="mermaid">
+flowchart LR
+  subgraph worker [Gateway Worker]
+    gate["Human gate\nemail session"]
+    tenancy["Tenancy\norg, role, billing"]
+    keys["Machine keys\nOAuth and pa_live_"]
+    decisions["Decision store\nlist and upsert"]
+    proxy["Engine proxy\nP and L and refresh"]
+  end
+  d1[("D1\nenvironment plus org")]
+  engine["Engine\nPDF render"]
+  gate --> tenancy --> d1
+  keys --> tenancy
+  decisions --> d1
+  decisions -->|"pack JSON"| engine
+  proxy --> engine
+        </pre>
+      </div>
+      <p class="caption">
+        When you click PDF, the Worker loads rows from D1 and asks the engine to draw the file.
+        Staging and production share one D1 database today; each row carries an
+        <code>environment</code> so they do not overwrite each other.
+      </p>
+
+      <h2>3b. Components — inside the engine</h2>
+      <div class="figure">
+        <pre class="mermaid">
+flowchart LR
+  subgraph engine [Python engine]
+    collect["Collectors\nShopify, Meta, CJ"]
+    pnl["pnl.py\nthe only P and L"]
+    snap["Snapshots\nlatest.json and clocks"]
+    render["Render\nPDF and Markdown"]
+  end
+  disk[("Org files")]
+  collect --> snap
+  pnl --> snap
+  render --> snap
+  snap --> disk
+        </pre>
+      </div>
+      <p class="caption">
+        Refresh and webhooks update the snapshot. The desk polls clocks and reloads when numbers change.
+        Improve jobs and DSers spreadsheet watches stay on the laptop — they are not in this Container.
+      </p>
+
+      <footer>
+        Briefing: <a href="start.html">technical onboarding</a>
+      </footer>
+    </div>
+    <script src="assets/site.js"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      const theme = document.documentElement.dataset.theme === "light" ? "neutral" : "dark";
+      mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme });
+      await mermaid.run({ querySelector: ".mermaid" });
+    </script>
+  </body>
+</html>

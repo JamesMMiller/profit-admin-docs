@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Technical briefing — Our Tech estate</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;650&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="assets/site.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="top">
+        <a class="brand" href="index.html">
+          <strong>Our Tech estate</strong>
+          <span>Context and architecture</span>
+        </a>
+        <nav class="links">
+          <a href="index.html">Home</a>
+          <a href="architecture.html">C4 diagrams</a>
+          <a href="start.html" aria-current="page">Onboarding</a>
+          <button type="button" class="btn" data-theme-toggle>Theme</button>
+        </nav>
+      </header>
+
+      <h1>Technical briefing</h1>
+      <p class="lede">
+        Read this before you change a Worker, a theme file, or a P&amp;L formula.
+        It is the context of the running estate — not a sign-in tutorial.
+      </p>
+
+      <div class="grid">
+        <a class="card" href="#estate">
+          <p class="kicker">1</p>
+          <h3>What the estate is</h3>
+          <p>A UK Shopify merchant. Customers see the shop, hello@, and track. Everything else is back office.</p>
+        </a>
+        <a class="card" href="#repos">
+          <p class="kicker">2</p>
+          <h3>Two repositories</h3>
+          <p>profit-admin is the desk product. business-ops is the Our Tech instance and the agent workspace.</p>
+        </a>
+        <a class="card" href="#invariants">
+          <p class="kicker">3</p>
+          <h3>Invariants</h3>
+          <p>P&amp;L stays in Python. Decisions stay in D1. Access is not membership.</p>
+        </a>
+        <a class="card" href="architecture.html">
+          <p class="kicker">4</p>
+          <h3>Then zoom</h3>
+          <p>C4 diagrams: estate context, then the desk containers and components.</p>
+        </a>
+      </div>
+
+      <h2 id="estate">What this estate is</h2>
+      <p>
+        <strong>Our Tech Accessories</strong> is a UK-only Shopify shop
+        (<code>ourtechaccessories.com</code>). It sells everyday tech accessories
+        (chargers, MagSafe banks, mounts, cases). There is no high-street stock.
+        A partner packs the box — mostly <strong>CJ Dropshipping</strong>, with leftover
+        <strong>AliExpress / DSers</strong> fulfilments. James is still the merchant:
+        the card charge, the brand, and “where is my order?” sit here.
+      </p>
+      <p>
+        The public face is three things: the storefront, <code>hello@ourtechaccessories.com</code>,
+        and <code>/pages/track</code>. Profit Admin, Meta Ads Manager, supplier consoles,
+        and this git workspace are operator surfaces. Customers never log into those.
+      </p>
+
+      <div class="figure">
+        <pre class="mermaid">
+flowchart TB
+  subgraph public [Customer-visible]
+    store["Shopify storefront"]
+    hello["hello@"]
+    track["/pages/track"]
+  end
+  subgraph edge [Edge]
+    mx["ImprovMX"]
+    proxy["track-proxy Worker"]
+    access["Cloudflare Access"]
+  end
+  subgraph back [Back office]
+    desk["Profit Admin"]
+    gmail["Store Gmail + Apps Script"]
+    meta["Meta ads + Pixel"]
+    cj["CJ / DSers / Alibaba"]
+    agent["Cursor in business-ops"]
+  end
+  store --> meta
+  store --> cj
+  hello --> mx --> gmail
+  track --> proxy --> cj
+  access --> desk
+  desk --> store
+  desk --> meta
+  desk --> cj
+  agent --> desk
+  agent --> store
+  agent --> meta
+        </pre>
+      </div>
+      <p class="caption">
+        Money, parcels, and mail each have one owner. Do not add a second path
+        that the customer or the P&amp;L will see twice.
+      </p>
+
+      <h2 id="repos">Two repositories</h2>
+      <table class="sheet">
+        <thead>
+          <tr>
+            <th>Repo</th>
+            <th>Job</th>
+            <th>Do not</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>JamesMMiller/profit-admin</code></td>
+            <td>
+              The desk product: Worker gateway, FastAPI engine, React UI, D1.
+              Submodule at <code>apps/profit-admin</code>.
+            </td>
+            <td>Put Our Tech secrets, theme edits, or agent skills here.</td>
+          </tr>
+          <tr>
+            <td><code>JamesMMiller/business-ops</code></td>
+            <td>
+              The Our Tech instance: <code>.env</code>, skills, storefront ops,
+              track-proxy, inbox, estate docs, and the submodule pin.
+            </td>
+            <td>Fork P&amp;L into a script in this repo. Call <code>pnl.py</code>.</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        Canonical skill edits live in <code>skills/</code> and <code>shared/skills/</code>,
+        then <code>./scripts/sync-skill.sh</code>. Copies under <code>.cursor/skills/</code>
+        are generated. Apps Script is <strong>paste-deployed</strong>: a git change does
+        nothing until someone pastes it into the store Google account.
+      </p>
+
+      <h2 id="surfaces">Live surfaces</h2>
+      <table class="sheet">
+        <thead>
+          <tr>
+            <th>Surface</th>
+            <th>Where</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Store</td>
+            <td><a href="https://ourtechaccessories.com">ourtechaccessories.com</a></td>
+            <td>Apex primary. Campaign PDP handles are URL-locked.</td>
+          </tr>
+          <tr>
+            <td>Track</td>
+            <td><a href="https://ourtechaccessories.com/pages/track">/pages/track</a></td>
+            <td><code>apps/track-proxy</code> — not the ops desk. Hides <code>CJ_API_KEY</code>.</td>
+          </tr>
+          <tr>
+            <td>Mail</td>
+            <td><code>hello@</code> → ImprovMX → store Gmail</td>
+            <td>Inbox bot on a 5-minute trigger. Escalations go to James, not the site.</td>
+          </tr>
+          <tr>
+            <td>Desk production</td>
+            <td><a href="https://desk.ourtechaccessories.com">desk.ourtechaccessories.com</a></td>
+            <td>Access, then D1 membership. Container cold-start can take a minute.</td>
+          </tr>
+          <tr>
+            <td>Desk staging</td>
+            <td>ota-profit-admin-desk-staging.ourtechaccessories.workers.dev</td>
+            <td>Default agent target. Own Container. Shared D1, namespaced by <code>environment</code>.</td>
+          </tr>
+          <tr>
+            <td>Laptop engine</td>
+            <td><code>http://127.0.0.1:8787</code></td>
+            <td>No Worker. Seed owner from business-ops <code>.env</code>.</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="muted">
+        The Android Profit Admin PWA is retired. Phone and laptop use the hosted desk.
+        Worker <code>ota-profit-admin</code> only redirects there.
+      </p>
+
+      <h2 id="money">How a sale becomes a desk number</h2>
+      <ol class="steps">
+        <li>Meta (or organic) lands on a <strong>locked PDP handle</strong>. Do not rename live campaign URLs; hot-swap the product under the handle.</li>
+        <li>Shopify checkout. Payments Basic UK — the desk assumes <strong>1.5% + £0.25</strong>.</li>
+        <li>Fulfilment: CJ app or leftover DSers. Tracking lands on the Shopify fulfilment; <code>track-proxy</code> HMAC-verifies the webhook, caches CJ, and can fire branded “on its way” mail.</li>
+        <li>Profit Admin collectors pull Shopify orders, Meta Insights, and landed COGS (DSers ledger → CJ API → Shopify <code>unitCost</code>). <code>pnl.py</code> is the only formula.</li>
+        <li>Hosted: Shopify webhooks bump the <strong>orders clock</strong>; a 15-minute cron bumps the <strong>ads clock</strong>. The desk polls clocks and reloads the snapshot. Full Refresh still owns CJ freight and catalog.</li>
+      </ol>
+      <p class="muted">
+        Meta has no spend webhook — Ads can lag 15 minutes. A new webhook order may sit on
+        <code>unitCost</code> until the next full Refresh quotes freight. Never invent cost on a Worker-only path.
+      </p>
+
+      <h2 id="ownership">Who owns which data</h2>
+      <table class="sheet">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>System of record</th>
+            <th>Ephemeral / derived</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Users, orgs, roles, API keys, decisions</td>
+            <td>D1 on the Worker</td>
+            <td>Engine disk is not a decision log. <code>MASTER_CONTEXT.md</code> is not either.</td>
+          </tr>
+          <tr>
+            <td>P&amp;L, snapshots, clocks, views, watches state</td>
+            <td>Engine org files (<code>/data/…</code> hosted, <code>outputs/profit-admin/org/</code> laptop)</td>
+            <td>Container disk dies on sleep. R2 is the planned durable store.</td>
+          </tr>
+          <tr>
+            <td>Org membership vs “can reach the hostname”</td>
+            <td>D1 membership + usable subscription</td>
+            <td>Cloudflare Access only answers “is this email allowed in?”</td>
+          </tr>
+          <tr>
+            <td>Store catalog, checkout, theme</td>
+            <td>Shopify</td>
+            <td>Git has theme sources and skills; live MAIN is a deploy.</td>
+          </tr>
+          <tr>
+            <td>Ad objects and spend</td>
+            <td>Meta</td>
+            <td>Desk Insights are a pull. New ads stay <strong>PAUSED</strong>.</td>
+          </tr>
+          <tr>
+            <td>Brand voice, dated ops notes</td>
+            <td>Local <code>MASTER_CONTEXT.md</code> Changelog</td>
+            <td>Read headings; do not ingest the whole file. Decisions that matter on the desk go to D1.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2 id="invariants">Invariants</h2>
+      <div class="rule">
+        <strong>P&amp;L is Python.</strong> <code>apps/profit-admin/pnl.py</code> is the only formula.
+        Do not reimplement contribution, MER, or ROAS in Worker JS.
+      </div>
+      <div class="rule">
+        <strong>Decisions are D1.</strong> <code>POST /api/v1/decisions</code> only.
+        Do not prepend <code>MASTER_CONTEXT.md</code>. Staging and production share one D1;
+        rows carry <code>environment</code>.
+      </div>
+      <div class="rule">
+        <strong>Access ≠ tenancy.</strong> Access is the human gate. No D1 membership →
+        Under construction. Agents never use Access cookies; they use OAuth
+        <code>pa_live_…</code> against <code>/api/v1</code>.
+      </div>
+      <div class="rule">
+        <strong>Default agent env is staging.</strong> Production only when asked.
+        After a material desk write, commit and push <strong>profit-admin</strong> then <strong>business-ops</strong>.
+      </div>
+      <div class="rule">
+        <strong>Campaign URLs are locked.</strong> Live ad landings keep their handle.
+        Fulfilment changes move the product under that handle.
+      </div>
+      <div class="rule">
+        <strong>Meta ads stay PAUSED</strong> when created from the repo. James unpauses in Ads Manager.
+        Default video for IG + Facebook feed is <code>1:1</code>.
+      </div>
+      <div class="rule">
+        <strong>Shopify webhooks bypass Access.</strong> HMAC only
+        (<code>X-Shopify-Hmac-Sha256</code>). Same idea on track-proxy fulfilments.
+      </div>
+      <div class="rule">
+        <strong>These do not run in the Container:</strong> Improve / Cursor jobs
+        (business-ops cwd), DSers <code>.xlsx</code> watch, Apps Script, theme paste.
+      </div>
+
+      <h2 id="trust">Trust boundary on the desk</h2>
+      <p>
+        Humans: Access JWT (Google) or break-glass <code>/gate?t=</code>.
+        The Worker sets <code>X-Profit-Admin-Email</code>, <code>Role</code>, <code>Org</code>.
+        With <code>TRUST_GATEWAY=1</code> the engine refuses requests that lack those headers
+        (except public paths). Viewer <code>POST</code> to Refresh / Settings is 403.
+      </p>
+      <p>
+        Machines: <code>POST /api/v1/oauth/token</code> then Bearer access token
+        (or long-lived <code>pa_live_…</code> for scripts). OpenAPI is at <code>$BASE/docs</code>.
+        <code>CLOUDFLARE_API_TOKEN</code> is Wrangler / Access admin only — never the desk Bearer.
+      </p>
+
+      <h2 id="edit">Where to change what</h2>
+      <table class="sheet">
+        <thead>
+          <tr>
+            <th>You want…</th>
+            <th>Change…</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>P&amp;L, collectors, Refresh, desk UI</td>
+            <td><code>apps/profit-admin/</code> — then pin the submodule in business-ops</td>
+          </tr>
+          <tr>
+            <td>Track page / fulfilment mail</td>
+            <td><code>page.track.liquid</code> + <code>apps/track-proxy</code> + paste the mailer if HTML changed</td>
+          </tr>
+          <tr>
+            <td>PDP / homepage</td>
+            <td><code>shopify-store</code> skill, dry-run first</td>
+          </tr>
+          <tr>
+            <td>Inbox FAQ / deal JSON</td>
+            <td><code>store-inbox</code> skill, then paste Apps Script / upsert the page</td>
+          </tr>
+          <tr>
+            <td>Paused Meta ads</td>
+            <td><code>meta-ad-builder</code> into an existing ad set</td>
+          </tr>
+          <tr>
+            <td>Supplier listing research</td>
+            <td><code>cj-dropshipping</code>, <code>tvc-mall</code>, <code>aliexpress-ds</code>, <code>alibaba-com</code> — do not auto-publish</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2 id="read">Read next</h2>
+      <ol class="steps">
+        <li><a href="architecture.html">C4 diagrams</a> on this site — estate, then desk.</li>
+        <li>
+          <a href="https://github.com/JamesMMiller/business-ops/blob/main/docs/estate/technical.md">docs/estate/technical.md</a>
+          — secrets map, purchase sequence, fulfilment lanes.
+        </li>
+        <li>
+          <a href="https://github.com/JamesMMiller/profit-admin/blob/main/docs/architecture.md">profit-admin docs/architecture.md</a>
+          — request path, clocks, Refresh, storage layout.
+        </li>
+        <li>
+          <a href="https://github.com/JamesMMiller/profit-admin/blob/main/docs/api-agents.md">docs/api-agents.md</a>
+          + the <code>profit-admin</code> skill — only when you are calling the machine API.
+        </li>
+      </ol>
+      <p class="muted">
+        Longer product tutorials stay in
+        <a href="https://github.com/JamesMMiller/profit-admin/tree/main/docs/tutorial">docs/tutorial</a>.
+        They assume you already have this map.
+      </p>
+
+      <footer>
+        Next: <a href="architecture.html">C4 diagrams</a>
+      </footer>
+    </div>
+    <script src="assets/site.js"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      const theme = document.documentElement.dataset.theme === "light" ? "neutral" : "dark";
+      mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme });
+      await mermaid.run({ querySelector: ".mermaid" });
+    </script>
+  </body>
+</html>

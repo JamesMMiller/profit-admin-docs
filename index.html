@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Our Tech estate — context and architecture</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;650&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="assets/site.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="top">
+        <a class="brand" href="index.html">
+          <strong>Our Tech estate</strong>
+          <span>Context and architecture</span>
+        </a>
+        <nav class="links">
+          <a href="index.html" aria-current="page">Home</a>
+          <a href="architecture.html">C4 diagrams</a>
+          <a href="start.html">Onboarding</a>
+          <button type="button" class="btn" data-theme-toggle>Theme</button>
+        </nav>
+      </header>
+
+      <h1>A UK Shopify shop, plus the systems that run it.</h1>
+      <p class="lede">
+        This site is the technical map of the Our Tech Accessories estate:
+        storefront, mail, tracking, ads, suppliers, and Profit Admin.
+        Read the briefing first, then zoom the C4 diagrams.
+      </p>
+
+      <div class="grid">
+        <a class="card" href="start.html">
+          <p class="kicker">Start here</p>
+          <h3>Technical briefing</h3>
+          <p>Repos, live surfaces, who owns which data, and the invariants you must not break.</p>
+        </a>
+        <a class="card" href="architecture.html">
+          <p class="kicker">C4</p>
+          <h3>Diagrams</h3>
+          <p>Estate context, then the desk: containers, gateway, engine.</p>
+        </a>
+        <a class="card" href="https://desk.ourtechaccessories.com">
+          <p class="kicker">Live</p>
+          <h3>Hosted desk</h3>
+          <p>desk.ourtechaccessories.com — one running piece, not the whole estate.</p>
+        </a>
+      </div>
+
+      <h2>In one sentence</h2>
+      <p>
+        Customers see the shop, <code>hello@</code>, and <code>/pages/track</code>.
+        The desk Worker answers “who is this, which organisation?”.
+        The Python engine is the only P&amp;L. Decisions live in D1 so they survive a Container restart.
+      </p>
+
+      <div class="note">
+        Implementer notes:
+        <a href="https://github.com/JamesMMiller/business-ops/blob/main/docs/estate/technical.md">estate/technical.md</a>,
+        <a href="https://github.com/JamesMMiller/profit-admin/blob/main/docs/architecture.md">profit-admin architecture.md</a>.
+        This site is the picture you read first.
+      </div>
+
+      <footer>
+        JamesMMiller/profit-admin-docs · Our Tech Accessories
+      </footer>
+    </div>
+    <script src="assets/site.js"></script>
+  </body>
+</html>
