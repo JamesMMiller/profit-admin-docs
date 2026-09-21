@@ -174,7 +174,7 @@ flowchart TB
           <tr>
             <td>Mail</td>
             <td><code>hello@</code> → ImprovMX → store Gmail</td>
-            <td>Inbox bot on a 5-minute trigger. Escalations go to James, not the site.</td>
+            <td>Desk Mail lists customer mail that needs a reply first. The inbox bot stays on until that send path works.</td>
           </tr>
           <tr>
             <td>Desk production</td>
@@ -215,7 +215,12 @@ flowchart TB
       <h2 id="mail">Hosted desk — Mail</h2>
       <p>
         <strong>Mail</strong> shows the store inbox for an owned address such as
-        <code>hello@ourtechaccessories.com</code>. A reply is generated from the
+        <code>hello@ourtechaccessories.com</code>. Genuine customer mail that still
+        needs a reply (an order, a refund, or anything unclear) is listed first.
+        The same inbox can be filtered into customer, discount, question, pitch,
+        and receipt. A saved reply can be added with
+        <code>POST /api/v1/mail-drafts</code>. It then appears in the template
+        list, and Generate reply fills that plain text and HTML. A reply is generated from the
         same branded HTML or plain text the Apps Script mailers use. New templates
         use that brand shell, or stay plain. The mailbox is still Gmail (ImprovMX
         forwards hello@ there). The desk sends through the Gmail API, so the script
