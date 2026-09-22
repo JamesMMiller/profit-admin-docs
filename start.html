@@ -220,10 +220,13 @@ flowchart TB
         The same inbox can be filtered into customer, discount, question, pitch,
         and receipt. A saved reply can be added with
         <code>POST /api/v1/mail-drafts</code>. It then appears in the template
-        list, and Generate reply fills that plain text and HTML. A reply is generated from the
+        list, and Generate reply fills that plain text and HTML. On an open thread,
+        Reply, Reply all, Quote, or Forward picks the message in the chain.
+        A reply is generated from the
         same branded HTML or plain text the Apps Script mailers use. New templates
         use that brand shell, or stay plain. The mailbox is still Gmail (ImprovMX
-        forwards hello@ there). The desk sends through the Gmail API, so the script
+        forwards hello@ there). The connection is stored for the organisation, so a
+        desk deploy does not drop it. The desk sends through the Gmail API, so the script
         trigger can be turned off once this path works.
       </p>
 
@@ -233,7 +236,7 @@ flowchart TB
         <li>Shopify checkout. Payments Basic UK — the desk assumes <strong>1.5% + £0.25</strong>.</li>
         <li>Fulfilment: CJ app or leftover DSers. Tracking lands on the Shopify fulfilment; <code>track-proxy</code> HMAC-verifies the webhook, caches CJ, and can fire branded “on its way” mail.</li>
         <li>Profit Admin collectors pull Shopify orders, Meta Insights, and landed COGS (DSers ledger → CJ API → Shopify <code>unitCost</code>). <code>pnl.py</code> is the only formula.</li>
-        <li>Hosted: Shopify webhooks bump the <strong>orders clock</strong>; a 15-minute cron bumps the <strong>ads clock</strong>. The desk polls clocks and reloads the snapshot. Full Refresh still owns CJ freight and catalog.</li>
+        <li>Hosted: Shopify webhooks bump the <strong>orders clock</strong>; a 15-minute cron bumps the <strong>ads clock</strong> and a short <strong>tracking</strong> batch for Delivery times. The desk polls clocks and reloads. Full Refresh still owns CJ freight and catalog.</li>
       </ol>
       <p class="muted">
         Meta has no spend webhook — Ads can lag 15 minutes. A new webhook order may sit on
@@ -242,7 +245,7 @@ flowchart TB
       <p>
         <strong>Finance</strong> on the desk is that same P&amp;L, summed for a period (all time, this month, last 7 days, last 30 days)
         against the matching prior window. It is a management view, not a tax computation.
-        The bank balance, and any large debtor or creditor, are figures an owner types in.
+        Bank readings, and any large debtor or creditor, are figures an owner types in. A reading can be removed, and it can store the all-time profit beside the balance.
         There is no bank feed. Customers pay at checkout, so the desk does not keep an aged debtor ledger.
       </p>
 
@@ -264,11 +267,11 @@ flowchart TB
           <tr>
             <td>P&amp;L, snapshots, clocks, views, watches state</td>
             <td>Engine org files (<code>/data/…</code> hosted, <code>outputs/profit-admin/org/</code> laptop)</td>
-            <td>Container disk dies on sleep. R2 is the planned durable store.</td>
+            <td>The engine sleeps after 2 minutes of quiet. Production's 15-minute cron wakes it; staging has no cron. Disk is fresh after sleep. R2 is the planned durable store.</td>
           </tr>
           <tr>
-            <td>Recorded bank balance and debtor / creditor notes</td>
-            <td>D1 <code>finance_cash</code> and <code>finance_balances</code></td>
+            <td>Recorded bank readings and debtor / creditor notes</td>
+            <td>D1 <code>finance_bank_entries</code> and <code>finance_balances</code></td>
             <td>Not a bank feed. Sales and profit on the Finance tab are summed from the engine P&amp;L.</td>
           </tr>
           <tr>
