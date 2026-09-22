@@ -110,8 +110,11 @@ flowchart TB
         </pre>
       </div>
       <p class="caption">
-        The Worker is the front door. D1 is durable (it survives a Container sleep).
-        Engine disk is not — that is why decisions moved off markdown files.
+        The React desk is a Worker asset. Opening a page does not start the engine.
+        API calls and Refresh do. The engine sleeps after 2 minutes of quiet.
+        Production's 15-minute cron wakes it; staging has no cron.
+        The first call after sleep can take about a minute.
+        D1 survives that sleep. Engine disk does not, which is why decisions live in D1.
         P&amp;L still lives in Python. Do not reimplement it in the Worker.
       </p>
 

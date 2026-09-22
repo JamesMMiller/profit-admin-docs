@@ -267,7 +267,7 @@ flowchart TB
           <tr>
             <td>P&amp;L, snapshots, clocks, views, watches state</td>
             <td>Engine org files (<code>/data/…</code> hosted, <code>outputs/profit-admin/org/</code> laptop)</td>
-            <td>The engine sleeps after 2 minutes of quiet. Production's 15-minute cron wakes it; staging has no cron. Disk is fresh after sleep. R2 is the planned durable store.</td>
+            <td>The engine sleeps after 2 minutes of quiet. A long Refresh stays up until it finishes. Production's 15-minute cron wakes it; staging has no cron. Opening the desk does not wake it — the page is a Worker asset. The first API call after sleep can take about a minute. Disk is fresh after sleep. R2 is the planned durable store.</td>
           </tr>
           <tr>
             <td>Recorded bank readings and debtor / creditor notes</td>
