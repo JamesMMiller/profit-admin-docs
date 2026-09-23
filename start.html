@@ -86,7 +86,7 @@ flowchart TB
   end
   subgraph back [Back office]
     desk["Profit Admin"]
-    gmail["Store Gmail + Apps Script"]
+    gmail["Store Gmail + desk Assist"]
     meta["Meta ads + Pixel"]
     cj["CJ / DSers / Alibaba"]
     agent["Cursor in business-ops"]
@@ -174,7 +174,7 @@ flowchart TB
           <tr>
             <td>Mail</td>
             <td><code>hello@</code> → ImprovMX → store Gmail</td>
-            <td>Desk Mail lists customer mail that needs a reply first. The inbox bot stays on until that send path works.</td>
+            <td>Desk Mail Assist drafts pitch/FAQ/deal and tracking; you send. Run <code>disableInboxBot</code> after a week of desk drafts.</td>
           </tr>
           <tr>
             <td>Desk production</td>
@@ -216,18 +216,16 @@ flowchart TB
       <p>
         <strong>Mail</strong> shows the store inbox for an owned address such as
         <code>hello@ourtechaccessories.com</code>. Genuine customer mail that still
-        needs a reply (an order, a refund, or anything unclear) is listed first.
-        The same inbox can be filtered into customer, discount, question, pitch,
-        and receipt. A saved reply can be added with
-        <code>POST /api/v1/mail-drafts</code>. It then appears in the template
-        list, and Generate reply fills that plain text and HTML. On an open thread,
-        Reply, Reply all, Quote, or Forward picks the message in the chain.
-        A reply is generated from the
-        same branded HTML or plain text the Apps Script mailers use. New templates
-        use that brand shell, or stay plain. The mailbox is still Gmail (ImprovMX
-        forwards hello@ there). The connection is stored for the organisation, so a
-        desk deploy does not drop it. The desk sends through the Gmail API, so the script
-        trigger can be turned off once this path works.
+        needs a reply is listed first. Filters include Assist drafts and Needs you.
+        <strong>Assist</strong> is two-tier triage: a cheap path drafts pitch, FAQ, and
+        volume-deal replies from <code>mail_seeds/</code>; a tool-using agent drafts
+        tracking replies from Shopify and track-proxy facts; refunds, returns, and
+        damage escalate with no draft. You still send through the Gmail API
+        (<code>POST /api/mail/send</code>). Cron polls
+        <code>POST /api/mail/triage/poll</code>. A saved reply can also be added with
+        <code>POST /api/v1/mail-drafts</code>. The mailbox is still Gmail (ImprovMX
+        forwards hello@). After a week of desk drafts you send, run Apps Script
+        <code>disableInboxBot</code>; leave fulfilment “on its way” mail on Apps Script.
       </p>
 
       <h2 id="money">How a sale becomes a desk number</h2>
