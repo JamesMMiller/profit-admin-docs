@@ -223,7 +223,8 @@ flowchart TB
         damage escalate with no draft. You still send through the Gmail API
         (<code>POST /api/mail/send</code>). Cron polls
         <code>POST /api/mail/triage/poll</code>. A saved reply can also be added with
-        <code>POST /api/v1/mail-drafts</code>. The mailbox is still Gmail (ImprovMX
+        <code>POST /api/v1/mail-drafts</code>. Edit a template under Mail → Templates (built-ins
+        save as an org override with the same id). The mailbox is still Gmail (ImprovMX
         forwards hello@). After a week of desk drafts you send, run Apps Script
         <code>disableInboxBot</code>; leave fulfilment “on its way” mail on Apps Script.
       </p>
