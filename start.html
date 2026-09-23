@@ -220,8 +220,10 @@ flowchart TB
         <strong>Assist</strong> is two-tier triage: a cheap path drafts pitch, FAQ, and
         volume-deal replies from <code>mail_seeds/</code>; a tool-using agent drafts
         tracking replies from Shopify and track-proxy facts; refunds, returns, and
-        damage escalate with no draft. You still send through the Gmail API
-        (<code>POST /api/mail/send</code>). Cron polls
+        damage escalate with no draft by default. Mail → Assist configures draft vs
+        auto-send per category (auto-send needs an explicit master switch; refund never
+        auto-sends). You still send through the Gmail API
+        (<code>POST /api/mail/send</code>) unless a category is set to auto-send. Cron polls
         <code>POST /api/mail/triage/poll</code>. A saved reply can also be added with
         <code>POST /api/v1/mail-drafts</code>. Edit a template under Mail → Templates (built-ins
         save as an org override with the same id). The mailbox is still Gmail (ImprovMX
