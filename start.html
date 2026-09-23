@@ -232,7 +232,8 @@ flowchart TB
         <code>disableInboxBot</code>; fulfilment “on its way” mail goes track-proxy →
         Profit Admin (<code>/webhooks/fulfillment-mail</code>).
         The Gmail OAuth row lives in D1 (<code>integration_secrets</code>) so a Container
-        replace does not drop the mailbox connection.
+        replace does not drop the mailbox connection. Empty saves never clear the refresh
+        token or owned addresses; only Disconnect deletes the row.
       </p>
 
       <h2 id="money">How a sale becomes a desk number</h2>
