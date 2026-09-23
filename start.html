@@ -227,6 +227,8 @@ flowchart TB
         save as an org override with the same id). The mailbox is still Gmail (ImprovMX
         forwards hello@). After a week of desk drafts you send, run Apps Script
         <code>disableInboxBot</code>; leave fulfilment “on its way” mail on Apps Script.
+        The Gmail OAuth row lives in D1 (<code>integration_secrets</code>) so a Container
+        replace does not drop the mailbox connection.
       </p>
 
       <h2 id="money">How a sale becomes a desk number</h2>
