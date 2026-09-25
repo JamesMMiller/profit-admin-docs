@@ -184,7 +184,7 @@ flowchart TB
           <tr>
             <td>Desk staging</td>
             <td>ota-profit-admin-desk-staging.ourtechaccessories.workers.dev</td>
-            <td>Desk development only. Own Container. Shared D1, namespaced by <code>environment</code>.</td>
+            <td>Desk development only. Own Container. Shared D1, namespaced by <code>environment</code>. Site admin can <strong>Try as a new user</strong> with no invite, then paste a Shopify store to create the org and land on Fulfillment.</td>
           </tr>
           <tr>
             <td>Laptop engine</td>
@@ -319,7 +319,9 @@ flowchart TB
       </div>
       <div class="rule">
         <strong>Access ≠ tenancy.</strong> Access is the human gate. No D1 membership →
-        Under construction. Agents never use Access cookies; they use OAuth
+        Under construction. A usable invite, beta invite, or staging “try as a new user”
+        can create an org by connecting Shopify (paste the store, approve, land on orders).
+        Agents never use Access cookies; they use OAuth
         <code>pa_live_…</code> against <code>/api/v1</code>.
       </div>
       <div class="rule">
