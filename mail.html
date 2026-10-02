@@ -1,0 +1,700 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mail system — Our Tech estate</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;650&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="assets/site.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="top">
+        <a class="brand" href="index.html">
+          <strong>Our Tech estate</strong>
+          <span>Context and architecture</span>
+        </a>
+        <nav class="links">
+          <a href="index.html">Home</a>
+          <a href="architecture.html">C4 diagrams</a>
+          <a href="mail.html" aria-current="page">Mail</a>
+          <a href="start.html">Onboarding</a>
+          <button type="button" class="btn" data-theme-toggle>Theme</button>
+        </nav>
+      </header>
+
+      <h1>How the mail system works</h1>
+      <p class="lede">
+        Profit Admin reads the store Gmail mailbox, drafts replies for the mail it can
+        safely answer, and puts them in front of a person. This page is the architecture
+        level picture: the parts, five sequence diagrams, the draft lifecycle, the rule
+        switches, and a checklist for “no drafts appearing”.
+      </p>
+
+      <div class="grid">
+        <a class="card" href="#components">
+          <p class="kicker">1</p>
+          <h3>Components</h3>
+          <p>Gmail, Worker cron, Worker mail store, engine, D1, the desk, the Mac app, <code>pa</code>.</p>
+        </a>
+        <a class="card" href="#poll">
+          <p class="kicker">2</p>
+          <h3>Sequences</h3>
+          <p>Poll, pitch declines, the Mail Queue, Gmail sign-in, and the Mail tab load.</p>
+        </a>
+        <a class="card" href="#lifecycle">
+          <p class="kicker">3</p>
+          <h3>Draft lifecycle</h3>
+          <p>The statuses a queued draft moves through, as the code defines them.</p>
+        </a>
+        <a class="card" href="#troubleshooting">
+          <p class="kicker">5</p>
+          <h3>Troubleshooting</h3>
+          <p>No drafts appearing: a short checklist of what to check.</p>
+        </a>
+      </div>
+
+      <div class="note">
+        Scope: this page describes what the Profit Admin repository does. Anything that
+        lives outside it is marked as such. Where the code does not settle a question, the
+        page says so rather than guessing. No credentials or customer data appear here.
+      </div>
+
+      <h2 id="components">1. Components</h2>
+      <div class="figure">
+        <pre class="mermaid">
+flowchart LR
+  subgraph google ["Google"]
+    gmail["Gmail mailbox and labels"]
+    gauth["Google OAuth and token endpoint"]
+  end
+  subgraph clients ["Clients"]
+    tab["Desk Mail tab, React in web/"]
+    mac["Mac app, web view of the same desk"]
+    pa["pa CLI, status and saved drafts"]
+  end
+  subgraph worker ["Cloudflare Worker"]
+    cron["Scheduled cron, mail-automation-cron.js"]
+    routes["Mail routes and mail store, mail-store.js and mail-drafts.js"]
+  end
+  subgraph engine ["Python engine in the Container"]
+    app["app.py mail routes"]
+    triage["mail_triage.py poll and routing"]
+    rules["mail_rules.py rule modes"]
+    assist["mail_assist.py Assist settings"]
+    mstore["mail_store.py client of the Worker mail store"]
+  end
+  d1[("D1 mail tables")]
+  tab --> routes
+  mac -->|"web view"| tab
+  pa --> routes
+  cron --> app
+  routes --> app
+  app --> triage
+  triage --> rules
+  triage --> assist
+  triage --> gmail
+  app --> gmail
+  app --> gauth
+  triage --> mstore
+  mstore -->|"internal mail-store API"| routes
+  routes --> d1
+        </pre>
+      </div>
+      <p class="caption">
+        The engine has no database of its own. It reads and writes mail state through the Worker,
+        and Gmail itself is only ever called from the engine.
+      </p>
+
+      <table class="sheet">
+        <thead>
+          <tr>
+            <th>Component</th>
+            <th>Where</th>
+            <th>Job</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Gmail</td>
+            <td>Google (outside this repo)</td>
+            <td>
+              The mailbox. The desk reads threads and labels and sends replies through the Gmail API.
+              The <code>inbox-bot/…</code> labels are applied by the store’s Apps Script inbox bot,
+              which lives outside this repository. The desk only reads the label names.
+            </td>
+          </tr>
+          <tr>
+            <td>Worker cron</td>
+            <td><code>src/mail-automation-cron.js</code>, <code>runMailTriage</code> in <code>src/index.js</code></td>
+            <td>
+              One scheduled run: send due deferred shipping mail, then poll the inbox for pitch
+              declines. Production runs every 15 minutes, staging hourly.
+            </td>
+          </tr>
+          <tr>
+            <td>Worker mail routes and store</td>
+            <td><code>src/mail-store.js</code>, <code>src/mail-drafts.js</code></td>
+            <td>
+              Authenticates desk requests and proxies <code>/api/mail/*</code> to the engine.
+              Owns the D1 mail store (outbox, queue, rules, triage jobs, tickets), computes the
+              draft digest, and stores the Gmail connection and the Assist settings.
+              <code>/api/v1/mail-drafts</code> (saved replies) is served here directly.
+            </td>
+          </tr>
+          <tr>
+            <td>Python engine</td>
+            <td>Cloudflare Container: <code>app.py</code>, <code>mail_triage.py</code>, <code>mail_rules.py</code>, <code>mail_store.py</code>, <code>mail_assist.py</code></td>
+            <td>
+              <code>app.py</code> exposes the mail routes. <code>mail_triage.py</code> polls, classifies, drafts
+              and queues. <code>mail_rules.py</code> resolves rule modes. <code>mail_assist.py</code> holds the
+              Assist settings and presets. <code>mail_store.py</code> is the client for the Worker mail store.
+              Also involved: <code>mail_box.py</code> (Gmail client, OAuth, templates, sending) and
+              <code>mail_queue_ops.py</code> (approve and send a queued draft).
+            </td>
+          </tr>
+          <tr>
+            <td>D1 mail tables</td>
+            <td>D1, rows scoped by <code>environment</code> and <code>org_id</code></td>
+            <td>
+              Drafts (the queue and saved replies), triage jobs, automation rules, the send outbox,
+              tickets, deferred shipping mail, returns, and mail settings such as sending hours.
+              The Gmail connection and the Assist settings are stored in D1,
+              not on the engine disk.
+            </td>
+          </tr>
+          <tr>
+            <td>Desk Mail tab</td>
+            <td><code>web/src/pages/mail/</code> (<code>MailQueue.tsx</code>, <code>MailAutomations.tsx</code>, inbox, sent, templates, settings, returns)</td>
+            <td>
+              The human surface. Inbox, Queue (the Mail Queue), Sent, Templates, Automations, Settings and
+              Returns. Reads go through an in-memory cache. Anything that sends or approves re-reads
+              the server first.
+            </td>
+          </tr>
+          <tr>
+            <td>Mac app</td>
+            <td><code>apps/macos</code></td>
+            <td>
+              Shows the hosted desk’s Mail screens in a <code>WKWebView</code>. It makes no native mail
+              API calls, so mail behaves exactly as it does in the browser. Gmail sign-in opens in the
+              default browser.
+            </td>
+          </tr>
+          <tr>
+            <td><code>pa</code> CLI</td>
+            <td><code>apps/cli</code></td>
+            <td>
+              Touches mail in a small way: <code>pa mail status</code>, <code>threads</code>, <code>send</code>,
+              and <code>drafts list | create | delete</code> (saved replies). There is no approve command:
+              queued drafts are reviewed and approved in the desk. <code>pa integrations list</code> warns
+              when Gmail needs reconnecting.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2 id="poll">2a. The scheduled mail poll</h2>
+      <div class="figure">
+        <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant Cron as Cloudflare cron
+  participant W as Worker
+  participant E as Engine
+  participant G as Gmail
+  participant D as D1
+  Cron->>W: scheduled tick, every 15 minutes on production
+  Note over W: Production runs several jobs and mail automation is one step. Staging runs mail automation only, hourly. Local does nothing.
+  W->>E: Step 1, send due deferred shipping mail
+  Note over W,E: Step 2 runs even if step 1 failed. Each failure is logged and isolated.
+  alt triage not enabled in this environment
+    W->>W: log the skip
+  else triage enabled
+    W->>D: find organisations to poll
+    loop each organisation
+      W->>D: load the Gmail row and Assist settings
+      W->>E: poll request with limit 12
+      E->>E: Assist enabled, cron_enabled, Gmail connected, mailbox address known?
+      E->>G: refresh the access token if the cached one is near expiry
+      E->>G: list recent threads for the mailbox
+      E->>G: read the label list once, label id to name
+      E->>G: read metadata for each candidate thread
+      Note over E,G: A thread tagged inbox-bot/pitch is classed as pitch. Other threads are classed by keyword rules.
+      loop each candidate thread, up to the poll limit
+        E->>E: skip if no inbound message, we spoke last, or this message was already settled
+        E->>G: read the full thread
+        E->>E: classify again, the inbox-bot/pitch label wins, other bot labels are ignored here
+        E->>E: route by rule mode and Assist action
+        alt pitch
+          E->>E: draft from the pitch-decline template
+          E->>D: insert-only queue row, through the Worker mail store
+        else FAQ or volume deal
+          E->>E: draft from a template, left as a draft unless the rule is Auto and the master switch is on
+        else tracking
+          E->>E: agent drafts from Shopify and tracking facts
+        else refund, return, damage or unclear
+          E->>E: escalate, no draft by default
+        end
+        E->>D: save the triage job
+      end
+      E-->>W: poll result with queued drafts and other desk drafts
+      W->>D: save non-pitch desk drafts as saved replies
+      W->>D: persist any refreshed Gmail credential
+      W->>W: log the poll result
+    end
+  end
+        </pre>
+      </div>
+      <p class="caption">
+        The label read is one Gmail call per poll, turning label ids
+        into names such as <code>inbox-bot/pitch</code>. If that call fails the names come back empty
+        and classification falls back to keywords. A poll looks at a bounded number of recent
+        threads. The cron asks for 12. Pitch declines go to the Mail Queue, never to the
+        saved-replies list.
+      </p>
+
+      <h2 id="pitch">2b. Pitch declines: drafted, never auto-sent</h2>
+      <div class="figure">
+        <pre class="mermaid">
+sequenceDiagram
+  participant P as Poll in the engine
+  participant R as Rule resolution
+  participant D as D1 mail tables
+  participant API as Desk API
+  participant K as Scripts and agents
+  participant H as Signed-in person
+  participant G as Gmail
+  P->>R: pitch thread found
+  Note over R: A pitch rule cannot be saved as Auto, and a stored Auto value still resolves to Draft.
+  R-->>P: action is draft
+  Note over P: The poll never auto-sends a pitch, whatever the rules and the master switch say.
+  P->>D: insert-only queue row, one per thread, status queued
+  alt a row for that thread exists in any state
+    D-->>P: nothing written, so a discarded or approved decline never comes back
+  end
+  K-xAPI: approving a pitch draft is refused, a signed-in person must do it
+  H->>API: approve with the digest of the draft reviewed
+  API->>D: claim queued to sending on that digest
+  API->>G: send in the sender's Gmail thread
+        </pre>
+      </div>
+      <p class="caption">
+        Pitch declines are drafts only. Several independent checks in the engine, the Worker and the desk
+        stop a pitch rule from being set to Auto, stop the poll from sending one, and make a signed-in
+        person approve each decline. Changing one setting cannot turn auto-send on for pitches.
+      </p>
+      <table class="sheet">
+        <thead><tr><th>Guarantee</th><th>What it means</th></tr></thead>
+        <tbody>
+          <tr><td>No Auto rule</td><td>A pitch rule cannot be saved as Auto, and a stored Auto value still behaves as Draft.</td></tr>
+          <tr><td>Queue only</td><td>The poll writes one queued decline per thread and sends nothing.</td></tr>
+          <tr><td>Person only</td><td>Only a signed-in person can edit or approve a pitch decline.</td></tr>
+          <tr><td>Send what was reviewed</td><td>A decline is sent only as the reviewer last saw it.</td></tr>
+        </tbody>
+      </table>
+      <p class="muted">
+        Not traced: this page has not confirmed whether the manual per-thread “Run triage” action also
+        queues a decline. It cannot send one. The queue row described above is written by the poll.
+      </p>
+
+      <h2 id="queue">2c. Human review in the Mail Queue</h2>
+      <div class="figure">
+        <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  actor H as Reviewer
+  participant UI as Mail Queue screen
+  participant E as Engine behind the Worker
+  participant S as Worker mail store and D1
+  participant G as Gmail
+  Note over UI,S: Browser requests reach the engine through the Worker. The engine reaches D1 only through the Worker mail store.
+  H->>UI: open Queue
+  UI->>E: GET /api/mail/queue/drafts, always revalidated
+  E->>S: list queued drafts
+  S-->>UI: drafts, each with a digest of the fields that decide what is sent
+  opt Edit
+    H->>UI: change subject, body or recipient
+    UI->>E: re-read the queue and compare with the screen
+    UI->>E: PUT the draft with the digest
+    E->>S: update only while still queued and unchanged
+    alt changed since review
+      S-->>UI: 409 draft_changed_since_review, edit not saved
+    else unchanged
+      S-->>UI: saved draft with a new digest
+    end
+  end
+  H->>UI: Approve and send
+  UI->>E: re-read the queue, refuse if the row differs from the screen
+  UI->>E: POST approve with the digest of the re-read row
+  E->>S: claim the draft on that digest
+  alt digest differs
+    S-->>E: changed
+    E-->>UI: 409 draft_changed_since_review, nothing sent
+  else not found or no longer queued
+    S-->>E: refused
+    E-->>UI: 404 or 409 draft_not_queued, nothing sent
+  else claimed
+    S-->>E: locked snapshot, status sending
+    E->>S: reserve an outbox row, refused unless the draft is claimed
+    E->>G: send the claimed snapshot, in the Gmail thread when there is one
+    G-->>E: accepted
+    E->>S: record the Gmail id and mark the outbox row sent
+    E->>S: finish the claim as approved
+    E-->>UI: approved and sent, row removed from the list
+  end
+  opt Approve all for one rule
+    H->>UI: confirm the dialog that lists the drafts
+    UI->>E: POST bulk-approve with the rule and an id plus digest for each listed draft, at most 200
+    loop each listed draft in order
+      E->>E: skip if wrong rule, person-only, changed or not queued
+      E->>S: claim, send and finish exactly as for a single approve
+    end
+    E-->>UI: approved, changed, not_found, skipped and errors lists
+    UI->>H: notice counting sent, changed, skipped and failed
+  end
+  alt Gmail or the token refresh refused before accepting
+    G-->>E: error
+    E->>S: mark the outbox row failed, release the claim
+    S-->>E: draft back to queued
+    E-->>UI: error shown on the queue, draft stays for another try
+  else timeout or transport error during the send call
+    E->>S: claim stays, draft remains sending
+    Note over S,UI: Whether Gmail received it is unknown. After 15 minutes the draft shows a Stuck badge. Check Sent in Gmail, then approve again or discard.
+  end
+        </pre>
+      </div>
+      <p class="caption">
+        This is the approve digest change from PR #51: approving, bulk approving and editing all send
+        or save exactly what the reviewer saw, or nothing. Approve and bulk approve are disabled until the
+        queue has been re-read since the screen was shown. A rule in dry-run records a
+        <code>dry_run</code> outbox row, sends nothing, and puts the draft back to queued.
+        Discarding a stuck draft whose email did reach Gmail marks it approved instead, and says it was
+        already sent.
+      </p>
+
+      <h2 id="gmail">2d. Gmail connect, reconnect and token refresh</h2>
+      <div class="figure">
+        <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  actor A as Admin or owner
+  participant UI as Mail settings
+  participant W as Worker
+  participant E as Engine
+  participant Gg as Google
+  participant D as D1
+  Note over A,D: Connect or Reconnect Gmail
+  A->>UI: Connect with Google
+  UI->>W: POST /api/integrations/gmail/oauth/start
+  W->>E: forward
+  E-->>UI: Google consent URL
+  UI->>Gg: browser opens the consent screen
+  Gg-->>W: redirect to the desk callback with a code and the state
+  W->>E: forward
+  alt the sign-in is valid for this person and organisation
+    E->>Gg: exchange the code for tokens
+    E-->>W: new Gmail connection fields
+    W->>D: save the connection
+    W-->>A: redirect to Mail, gmail connected
+  else otherwise
+    E-->>A: error page, nothing saved
+  end
+  Note over A,D: Every later mail request and every cron poll
+  W->>D: load the Gmail connection
+  W->>E: request with the connection attached
+  alt cached access token valid for another minute
+    E->>E: use it
+  else needs a refresh
+    E->>Gg: refresh token grant, retried a few times
+    alt refreshed
+      Gg-->>E: new access token, sometimes a rotated refresh token
+      E-->>W: save fields and clear any reconnect flag
+      W->>D: persist
+    else permanent refusal, invalid_grant, invalid_client and similar
+      E-->>W: save auth_state needs_reconnect, keep the refresh token
+      E-->>UI: 409, Gmail needs reconnecting
+    else transient, network error, 5xx or 429
+      E-->>W: save a transient marker
+      E-->>UI: 503, requests fail fast for a short while
+    end
+  end
+  E->>Gg: Gmail API call with the access token
+  alt Gmail answers 401
+    E->>Gg: drop the cached token and refresh once
+  end
+        </pre>
+      </div>
+      <p class="caption">
+        The Gmail connection is stored in D1, not on the engine disk, so replacing the Container does
+        not drop the mailbox. Only Disconnect deletes it.
+      </p>
+      <table class="sheet">
+        <thead>
+          <tr>
+            <th>Situation</th>
+            <th>What happens</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Access token expires</td>
+            <td>Normal. The engine refreshes it when the cached one has under a minute left. No one sees it.</td>
+          </tr>
+          <tr>
+            <td>Google network error, 5xx or 429</td>
+            <td>Retried a few times. The saved connection is untouched. Further requests answer 503 immediately for a short while. The Mail status shows <code>degraded</code> until a refresh works.</td>
+          </tr>
+          <tr>
+            <td>Refresh token expired or revoked (<code>invalid_grant</code>)</td>
+            <td>The row is flagged <code>needs_reconnect</code> and keeps its token. A red Reconnect Gmail banner shows on Mail, Mail settings and Settings, including in the Mac app. Google is re-checked periodically. Polls and sends fail until someone reconnects.</td>
+          </tr>
+          <tr>
+            <td>The desk’s own OAuth client is wrong or disabled</td>
+            <td>Same flag, but the banner says to check the client settings, because reconnecting cannot fix it.</td>
+          </tr>
+          <tr>
+            <td>Gmail answers 401 to a cached access token</td>
+            <td>The cached token is dropped and refreshed once. That refresh is what notices a revoked grant.</td>
+          </tr>
+          <tr>
+            <td>Reconnecting</td>
+            <td>A successful reconnect clears the flag at once. If Google does not return a usable connection, the reconnect fails and nothing is saved.</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="muted">
+        Not settled by the code: the poll route does not translate Gmail sign-in errors into a specific
+        status, so a poll against a dead Gmail connection shows up as a generic error in the
+        logs rather than as a named error. Google’s own reasons for
+        <code>invalid_grant</code> (an OAuth consent screen left in Testing, a password change, access
+        removed in the Google account) are outside this repository.
+      </p>
+
+      <h2 id="load">2e. Mail tab load, cached data and background refresh</h2>
+      <div class="figure">
+        <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  actor U as User
+  participant UI as Mail tab, in the browser or the Mac app web view
+  participant C as In-memory cache
+  participant W as Worker
+  participant E as Engine
+  participant G as Gmail
+  U->>UI: open Mail
+  UI->>C: read mail home, queue and thread list for this user and organisation
+  alt first visit this session
+    C-->>UI: nothing cached, loading state
+    UI->>W: GET /api/mail
+    W->>E: mailbox status and templates
+    E-->>UI: Gmail health and templates, no Google call
+    UI->>W: GET /api/mail/threads
+    W->>E: forward
+    E->>G: list threads, read label names and thread metadata
+    G-->>UI: threads
+    UI->>C: store the copies
+  else returning in the same session
+    C-->>UI: last copy shown at once
+    Note over UI: A thin sync bar shows while the screen revalidates.
+    par queue and outbox, always revalidated
+      UI->>W: GET /api/mail/queue/drafts
+    and thread list, older than 20 seconds
+      UI->>W: GET /api/mail/threads
+    and mail home, older than 60 seconds
+      UI->>W: GET /api/mail
+    end
+    W-->>UI: fresh data replaces the copy
+  end
+  Note over UI: Approve, discard, edit and bulk approve stay disabled until the queue has answered since the screen was shown.
+  U->>UI: approve a draft
+  UI->>W: POST approve
+  W-->>UI: result
+  UI->>C: invalidate the affected reads and refetch them
+        </pre>
+      </div>
+      <p class="caption">
+        This is the stale-while-revalidate read cache from PR #41. It lives in browser memory only,
+        is keyed by user and organisation, and is wiped when either changes. Mail sections you have
+        visited stay mounted, so the open thread and an unsent reply survive a trip to another section.
+        Entries nobody is looking at are dropped after 30 minutes.
+      </p>
+
+      <h2 id="lifecycle">3. Mail draft lifecycle</h2>
+      <div class="figure">
+        <pre class="mermaid">
+stateDiagram-v2
+  [*] --> queued: queued by the poll, lifecycle mail, returns or the queue API
+  queued --> queued: edited with the digest
+  queued --> sending: approve claims it on the digest
+  queued --> discarded: discard
+  queued --> superseded: a sibling lifecycle mail was sent
+  sending --> approved: Gmail accepted or already sent
+  sending --> queued: released, failed before Gmail accepted, or dry run
+  sending --> sending: no answer for 15 minutes, shown as Stuck
+  sending --> approved: discard finds it was sent
+  sending --> discarded: stuck and not sent, discard
+  approved --> [*]
+  discarded --> [*]
+  superseded --> [*]
+        </pre>
+      </div>
+      <p class="caption">
+        These are the draft statuses in code: <code>queued</code>,
+        <code>sending</code>, <code>approved</code>, <code>discarded</code> and
+        <code>superseded</code>. The status is free text in the schema, so the list comes from the
+        code, not a constraint. Rows with no status are saved replies for the Drafts list, not queue items.
+        A stuck draft (<code>sending</code> for over 15 minutes) can be claimed again or discarded.
+      </p>
+      <p>
+        <strong>Re-queueing.</strong> Pitch declines are written insert-only, so a thread that has a
+        row in any state is never queued again. Other writers use a plain upsert, which sets the row
+        back to <code>queued</code> unless it is currently <code>sending</code>.
+      </p>
+      <p>
+        <strong>Triage jobs</strong> have their own states:
+        <code>pending</code>, <code>classifying</code>, <code>draft_ready</code>, <code>agent_running</code>,
+        <code>agent_draft</code>, <code>sent</code>, <code>escalate</code>, <code>failed</code>,
+        <code>skipped</code> and <code>dismissed</code>. A job is the engine’s record of how it handled a
+        thread. A draft in the queue is what a person acts on.
+      </p>
+
+      <h2 id="rules">4. Rule modes and switches</h2>
+      <p>
+        Each automation rule (one per kind, per organisation) has a mode and a dry-run flag, stored per
+        organisation. Assist settings add category actions and the switches below.
+      </p>
+      <table class="sheet">
+        <thead>
+          <tr>
+            <th>Setting</th>
+            <th>Meaning</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Rule mode <code>off</code></td>
+            <td>Nothing is drafted or sent for that kind. Triage skips the category. For shipping mail the outbox records it as dropped.</td>
+          </tr>
+          <tr>
+            <td>Rule mode <code>draft</code></td>
+            <td>A draft is left for a person. Pitch declines go to the Mail Queue. Other Assist drafts appear as saved replies.</td>
+          </tr>
+          <tr>
+            <td>Rule mode <code>auto</code></td>
+            <td>The engine may send without a person, but only if the master auto-send switch is on, the kind is not on the never-auto list, and the poll budget is not used up. Without the master switch an Auto rule resolves to Draft.</td>
+          </tr>
+          <tr>
+            <td>Dry run</td>
+            <td>The send path runs but records a <code>dry_run</code> outbox row and does not call Gmail.</td>
+          </tr>
+          <tr>
+            <td>Master auto-send (<code>auto_send_enabled</code>)</td>
+            <td>Off by default. Required for any rule in Auto mode. It does not affect whether pitch drafts appear.</td>
+          </tr>
+          <tr>
+            <td><code>max_auto_sends_per_poll</code></td>
+            <td>The most automatic sends one poll may make. Default 3, range 0 to 40. Further candidates stay drafts and are marked as deferred by the poll budget. It counts as 0 while the master switch is off.</td>
+          </tr>
+          <tr>
+            <td>Assist enabled (<code>enabled</code>)</td>
+            <td>On by default. Off means polls do nothing.</td>
+          </tr>
+          <tr>
+            <td>Cron poll enabled (<code>cron_enabled</code>)</td>
+            <td>On by default. Off stops the scheduled poll but not manual runs.</td>
+          </tr>
+          <tr>
+            <td>Poll limit, cheap path, tracking agent</td>
+            <td>Poll limit defaults to 12 (maximum 40). Turning the cheap path off sends pitch, FAQ and deal to escalate. Turning the tracking agent off does the same for tracking.</td>
+          </tr>
+          <tr>
+            <td>Category actions and presets</td>
+            <td>Each category (pitch, FAQ, deal, tracking, unclear, refund, receipt) is Draft, Auto-send, Escalate or Skip. Presets set them together: safe drafts (default), auto cheap, human only, paused.</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="muted">
+        Staging runs inbox triage only when it is explicitly enabled. Production always does. Shipping
+        mail outside the organisation’s sending hours (London 08:00 to 20:00 unless changed in Mail
+        settings) is parked and sent by the next eligible cron run.
+      </p>
+
+      <h3>Never auto-sent</h3>
+      <div class="rule">
+        <strong>These kinds cannot run in Auto mode:</strong>
+        <code>refund</code>, <code>refund-return-damage</code>, <code>return</code>,
+        <code>return-approved</code>, <code>damage</code>, <code>delay-apology</code>
+        (also spelled <code>delay_apology</code>) and <code>pitch</code>.
+        Saving one as Auto is refused by both the engine and the Worker, and an Auto row that
+        exists anyway resolves to Draft. In Assist settings a refund category set to auto-send is
+        reset to escalate.
+      </div>
+      <p>
+        Refund, return and damage mail is escalated with no draft by default. Return emails also carry a
+        customer’s return QR or label, so they are only ever sent to the customer’s own address, and only a
+        signed-in person can act on them.
+      </p>
+
+      <h2 id="troubleshooting">5. Troubleshooting: no drafts appearing</h2>
+      <p>Work down the list. The detailed runbook, with the tables and logs to check, is private. Ask a maintainer for it.</p>
+      <ol class="steps">
+        <li>
+          <strong>Is the scheduled run happening?</strong>
+          Production polls on a schedule. Staging only polls when it has been explicitly enabled.
+          Also check the organisation has a usable subscription. Organisations without one are not polled.
+        </li>
+        <li>
+          <strong>Is Gmail connected?</strong>
+          The Mail tab shows a red banner when Gmail needs reconnecting. Reconnect from Mail settings.
+        </li>
+        <li>
+          <strong>Is the label present?</strong>
+          Open the thread in Gmail and look for <code>inbox-bot/pitch</code>. The label is applied outside
+          this repository. Without it the thread is classed by keywords, and many pitches contain none,
+          so they are escalated with no draft. The thread must also be recent, the newest message must
+          not be from us, and it must not already be settled.
+        </li>
+        <li>
+          <strong>What is the rule mode?</strong>
+          In Mail, Automations, the pitch rule should be Draft. Off skips the category. In Assist
+          settings, a pitch action of Escalate gives no draft, and so does turning the cheap path off.
+        </li>
+        <li>
+          <strong>Are the Assist switches on?</strong>
+          Assist enabled and Cron poll enabled, both in Mail, Automations, must be on. Master auto-send is
+          not one of them, because pitch declines are drafts either way.
+        </li>
+        <li>
+          <strong>Was a draft already made?</strong>
+          A pitch decline is created once per thread, in any status, and never again after that. Look in
+          Mail, Queue, not in the saved replies.
+        </li>
+        <li>
+          <strong>Still nothing?</strong>
+          See the private runbook for the engine and Worker logs and the data to inspect.
+        </li>
+      </ol>
+
+      <footer>
+        Next: <a href="architecture.html">C4 diagrams</a> · <a href="start.html">technical onboarding</a>
+      </footer>
+    </div>
+    <script src="assets/site.js"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.min.js"
+      integrity="sha384-EOXBFmc3gx5mb+vn0vPvvGqACToJD24hhacX5Yx+8NUUQrHIle/Qi5Bg9o3zKwW2"
+      crossorigin="anonymous"
+    ></script>
+    <script>
+      const theme = document.documentElement.dataset.theme === "light" ? "neutral" : "dark";
+      mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme });
+      mermaid.run({ querySelector: ".mermaid" });
+    </script>
+  </body>
+</html>

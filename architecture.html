@@ -22,6 +22,7 @@
         <nav class="links">
           <a href="index.html">Home</a>
           <a href="architecture.html" aria-current="page">C4 diagrams</a>
+          <a href="mail.html">Mail</a>
           <a href="start.html">Onboarding</a>
           <button type="button" class="btn" data-theme-toggle>Theme</button>
         </nav>
@@ -42,7 +43,7 @@ flowchart LR
   shopper["UK shopper"]
   james["James / Cursor"]
   store["Shopify store"]
-  mail["hello@ + track-proxy"]
+  mail["Store mailbox + track-proxy"]
   ads["Meta ads"]
   desk["Profit Admin"]
   suppliers["CJ / DSers / Alibaba"]
@@ -62,7 +63,7 @@ flowchart LR
       <p class="caption">
         The estate is the shop plus the back office. Profit Admin is one box:
         it reads money and writes decisions. It does not serve the storefront
-        or hide the CJ tracking key — that is track-proxy.
+        or hold supplier credentials — that is track-proxy.
       </p>
 
       <h2>1. Context — who talks to Profit Admin</h2>
@@ -112,7 +113,7 @@ flowchart TB
       <p class="caption">
         The React desk is a Worker asset. Opening a page does not start the engine.
         API calls and Refresh do. The engine sleeps after 2 minutes of quiet.
-        Production's 15-minute cron wakes it; staging has no cron.
+        Production's 15-minute cron wakes it; staging runs only the mail automation, hourly.
         The first call after sleep can take about a minute.
         D1 survives that sleep. Engine disk does not, which is why decisions live in D1.
         P&amp;L still lives in Python. Do not reimplement it in the Worker.
@@ -125,7 +126,7 @@ flowchart LR
   subgraph worker [Gateway Worker]
     gate["Human gate\nemail session"]
     tenancy["Tenancy\norg, role, billing"]
-    keys["Machine keys\nOAuth and pa_live_"]
+    keys["Machine keys\nOAuth and API keys"]
     decisions["Decision store\nlist and upsert"]
     proxy["Engine proxy\nP and L and refresh"]
   end
@@ -167,16 +168,26 @@ flowchart LR
         Improve jobs and DSers spreadsheet watches stay on the laptop — they are not in this Container.
       </p>
 
+      <p class="muted">
+        Mail is its own subsystem inside the gateway and the engine. Its components, sequence diagrams and
+        draft lifecycle are on the <a href="mail.html">Mail system</a> page.
+      </p>
+
       <footer>
-        Briefing: <a href="start.html">technical onboarding</a>
+        Briefing: <a href="start.html">technical onboarding</a> ·
+        Mail: <a href="mail.html">how the mail system works</a>
       </footer>
     </div>
     <script src="assets/site.js"></script>
-    <script type="module">
-      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+    <script
+      src="https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.min.js"
+      integrity="sha384-EOXBFmc3gx5mb+vn0vPvvGqACToJD24hhacX5Yx+8NUUQrHIle/Qi5Bg9o3zKwW2"
+      crossorigin="anonymous"
+    ></script>
+    <script>
       const theme = document.documentElement.dataset.theme === "light" ? "neutral" : "dark";
       mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme });
-      await mermaid.run({ querySelector: ".mermaid" });
+      mermaid.run({ querySelector: ".mermaid" });
     </script>
   </body>
 </html>

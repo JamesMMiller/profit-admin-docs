@@ -22,6 +22,7 @@
         <nav class="links">
           <a href="index.html">Home</a>
           <a href="architecture.html">C4 diagrams</a>
+          <a href="mail.html">Mail</a>
           <a href="start.html" aria-current="page">Onboarding</a>
           <button type="button" class="btn" data-theme-toggle>Theme</button>
         </nav>
@@ -37,7 +38,7 @@
         <a class="card" href="#estate">
           <p class="kicker">1</p>
           <h3>What the estate is</h3>
-          <p>A UK Shopify merchant. Customers see the shop, hello@, and track. Everything else is back office.</p>
+          <p>A UK Shopify merchant. Customers see the shop, the store mailbox, and track. Everything else is back office.</p>
         </a>
         <a class="card" href="#repos">
           <p class="kicker">2</p>
@@ -66,7 +67,7 @@
         the card charge, the brand, and “where is my order?” sit here.
       </p>
       <p>
-        The public face is three things: the storefront, <code>hello@ourtechaccessories.com</code>,
+        The public face is three things: the storefront, the store mailbox,
         and <code>/pages/track</code>. Profit Admin, Meta Ads Manager, supplier consoles,
         and this git workspace are operator surfaces. Customers never log into those.
       </p>
@@ -76,11 +77,11 @@
 flowchart TB
   subgraph public [Customer-visible]
     store["Shopify storefront"]
-    hello["hello@"]
+    hello["Store mailbox"]
     track["/pages/track"]
   end
   subgraph edge [Edge]
-    mx["ImprovMX"]
+    mx["Mail forwarding"]
     proxy["track-proxy Worker"]
     access["Cloudflare Access"]
   end
@@ -130,7 +131,7 @@ flowchart TB
           <tr>
             <td><code>JamesMMiller/business-ops</code></td>
             <td>
-              The Our Tech instance: <code>.env</code>, skills, storefront ops,
+              The Our Tech instance: local configuration, skills, storefront ops,
               track-proxy, inbox, estate docs, and the submodule pin.
             </td>
             <td>Fork P&amp;L into a script in this repo. Call <code>pnl.py</code>.</td>
@@ -169,12 +170,12 @@ flowchart TB
           <tr>
             <td>Track</td>
             <td><a href="https://ourtechaccessories.com/pages/track">/pages/track</a></td>
-            <td><code>apps/track-proxy</code> — not the ops desk. Hides <code>CJ_API_KEY</code>.</td>
+            <td><code>apps/track-proxy</code> — not the ops desk. Keeps the supplier credential off the storefront.</td>
           </tr>
           <tr>
             <td>Mail</td>
-            <td><code>hello@</code> → ImprovMX → store Gmail</td>
-            <td>Desk Mail Assist drafts pitch/FAQ/deal and tracking; you send. Run <code>disableInboxBot</code> after a week of desk drafts.</td>
+            <td>Store mailbox → forwarding → store Gmail</td>
+            <td>Desk Mail Assist drafts pitch/FAQ/deal and tracking; you send. The old inbox bot is retired once desk drafts have proven themselves.</td>
           </tr>
           <tr>
             <td>Desk production</td>
@@ -183,13 +184,13 @@ flowchart TB
           </tr>
           <tr>
             <td>Desk staging</td>
-            <td>ota-profit-admin-desk-staging.ourtechaccessories.workers.dev</td>
-            <td>Desk development only. Own Container. Shared D1, namespaced by <code>environment</code>. Site admin can <strong>Try as a new user</strong> with no invite, then paste a Shopify store to create the org and land on Fulfillment.</td>
+            <td>Separate staging desk (address kept in the private operator notes)</td>
+            <td>Desk development only. Own Container. Shared D1, namespaced by <code>environment</code>.</td>
           </tr>
           <tr>
             <td>Laptop engine</td>
             <td><code>http://127.0.0.1:8787</code></td>
-            <td>No Worker. Seed owner from business-ops <code>.env</code>.</td>
+            <td>No Worker. Seed owner from the business-ops local configuration.</td>
           </tr>
         </tbody>
       </table>
@@ -219,32 +220,34 @@ flowchart TB
       <h2 id="mail">Hosted desk — Mail</h2>
       <p>
         <strong>Mail</strong> shows the store inbox for an owned address such as
-        <code>hello@ourtechaccessories.com</code>. Genuine customer mail that still
+        the store mailbox. Genuine customer mail that still
         needs a reply is listed first. Filters include Assist drafts and Needs you.
         <strong>Assist</strong> is two-tier triage: a cheap path drafts pitch, FAQ, and
-        volume-deal replies from <code>mail_seeds/</code>; a tool-using agent drafts
+        volume-deal replies from built-in seed templates; a tool-using agent drafts
         tracking replies from Shopify and track-proxy facts; refunds, returns, and
         damage escalate with no draft by default. Mail → Assist has presets (safe drafts,
         auto cheap, human only, paused), per-category action chips, and an effective-routing
         summary (auto-send needs an explicit master switch; refund never auto-sends). You
         still send through the Gmail API
-        (<code>POST /api/mail/send</code>) unless a category is set to auto-send. Cron polls
-        <code>POST /api/mail/triage/poll</code>. A saved reply can also be added with
-        <code>POST /api/v1/mail-drafts</code>. Edit a template under Mail → Templates (built-ins
-        save as an org override with the same id). The mailbox is still Gmail (ImprovMX
-        forwards hello@). After a week of desk drafts you send, run Apps Script
-        <code>disableInboxBot</code>; fulfilment “on its way” mail goes track-proxy →
-        Profit Admin (<code>/webhooks/fulfillment-mail</code>).
-        The Gmail OAuth row lives in D1 (<code>integration_secrets</code>) so a Container
+        unless a category is set to auto-send. A scheduled poll drafts replies in the background.
+        A saved reply can also be added through the API. Edit a template under Mail → Templates (built-ins
+        save as an org override with the same id). The mailbox is still Gmail, with the store address
+        forwarded to it. Once desk drafts have proven themselves, the old inbox bot is retired;
+        fulfilment “on its way” mail goes track-proxy → Profit Admin.
+        The Gmail connection is stored in D1, so a Container
         replace does not drop the mailbox connection. Empty saves never clear the refresh
         token or owned addresses; only Disconnect deletes the row.
+      </p>
+      <p class="muted">
+        Components, sequence diagrams, the draft lifecycle, and a “no drafts appearing”
+        checklist are on the <a href="mail.html">Mail system</a> page.
       </p>
 
       <h2 id="money">How a sale becomes a desk number</h2>
       <ol class="steps">
         <li>Meta (or organic) lands on a <strong>locked PDP handle</strong>. Do not rename live campaign URLs; hot-swap the product under the handle.</li>
         <li>Shopify checkout. Payments Basic UK — the desk assumes <strong>1.5% + £0.25</strong>.</li>
-        <li>Fulfilment: CJ app or leftover DSers. Tracking lands on the Shopify fulfilment; <code>track-proxy</code> HMAC-verifies the webhook, caches CJ, and can fire branded “on its way” mail.</li>
+        <li>Fulfilment: CJ app or leftover DSers. Tracking lands on the Shopify fulfilment; <code>track-proxy</code> verifies the webhook, caches CJ, and can fire branded “on its way” mail.</li>
         <li>Profit Admin collectors pull Shopify orders, Meta Insights, and landed COGS (DSers ledger → CJ API → Shopify <code>unitCost</code>). <code>pnl.py</code> is the only formula.</li>
         <li>Hosted: Shopify webhooks bump the <strong>orders clock</strong>; a 15-minute cron bumps the <strong>ads clock</strong> and a short <strong>tracking</strong> batch for Delivery times. The desk polls clocks and reloads. Full Refresh still owns CJ freight and catalog.</li>
       </ol>
@@ -277,7 +280,7 @@ flowchart TB
           <tr>
             <td>P&amp;L, snapshots, clocks, views, watches state</td>
             <td>Engine org files (<code>/data/…</code> hosted, <code>outputs/profit-admin/org/</code> laptop)</td>
-            <td>The engine sleeps after 2 minutes of quiet. A long Refresh stays up until it finishes. Production's 15-minute cron wakes it; staging has no cron. Opening the desk does not wake it — the page is a Worker asset. The first API call after sleep can take about a minute. Disk is fresh after sleep. R2 is the planned durable store.</td>
+            <td>The engine sleeps after 2 minutes of quiet. A long Refresh stays up until it finishes. Production's 15-minute cron wakes it; staging runs only the mail automation, hourly. Opening the desk does not wake it — the page is a Worker asset. The first API call after sleep can take about a minute. The engine disk is a cache and is empty after sleep: the last good copy of each org's desk files lives in that org's DeskHub Durable Object and is seeded back. R2 is not required; it is optional snapshot history only if a bucket is bound.</td>
           </tr>
           <tr>
             <td>Recorded bank readings and debtor / creditor notes</td>
@@ -319,10 +322,10 @@ flowchart TB
       </div>
       <div class="rule">
         <strong>Access ≠ tenancy.</strong> Access is the human gate. No D1 membership →
-        Under construction. A usable invite, beta invite, or staging “try as a new user”
+        Under construction. A usable invite or beta invite
         can create an org by connecting Shopify (paste the store, approve, land on orders).
-        Agents never use Access cookies; they use OAuth
-        <code>pa_live_…</code> against <code>/api/v1</code>.
+        Agents never use Access sessions; they use OAuth
+        or an API key against <code>/api/v1</code>.
       </div>
       <div class="rule">
         <strong>Default agent env is production</strong> for live Our Tech ops.
@@ -340,8 +343,8 @@ flowchart TB
         Default video for IG + Facebook feed is <code>1:1</code>.
       </div>
       <div class="rule">
-        <strong>Shopify webhooks bypass Access.</strong> HMAC only
-        (<code>X-Shopify-Hmac-Sha256</code>). Same idea on track-proxy fulfilments.
+        <strong>Shopify webhooks are not behind Access.</strong> They are verified by Shopify’s
+        signature instead. Same idea on track-proxy fulfilments.
       </div>
       <div class="rule">
         <strong>These do not run in the Container:</strong> Improve / Cursor jobs
@@ -350,15 +353,15 @@ flowchart TB
 
       <h2 id="trust">Trust boundary on the desk</h2>
       <p>
-        Humans: Access JWT (Google) or break-glass <code>/gate?t=</code>.
-        The Worker sets <code>X-Profit-Admin-Email</code>, <code>Role</code>, <code>Org</code>.
-        With <code>TRUST_GATEWAY=1</code> the engine refuses requests that lack those headers
-        (except public paths). Viewer <code>POST</code> to Refresh / Settings is 403.
+        Humans sign in through Cloudflare Access (Google). A separate operator-only fallback exists
+        and is documented privately. The Worker passes the verified identity, role and organisation
+        on to the engine, and in the hosted setup the engine refuses requests that did not come
+        through the Worker (except public paths). Viewer <code>POST</code> to Refresh / Settings is 403.
       </p>
       <p>
         Machines: <code>POST /api/v1/oauth/token</code> then Bearer access token
-        (or long-lived <code>pa_live_…</code> for scripts). OpenAPI is at <code>$BASE/docs</code>.
-        <code>CLOUDFLARE_API_TOKEN</code> is Wrangler / Access admin only — never the desk Bearer.
+        (or a long-lived API key for scripts). OpenAPI is at <code>$BASE/docs</code>.
+        Cloudflare admin credentials are for deployment and Access administration only — never the desk Bearer.
       </p>
 
       <h2 id="edit">Where to change what</h2>
@@ -406,7 +409,7 @@ flowchart TB
         <li><a href="architecture.html">C4 diagrams</a> on this site — estate, then desk.</li>
         <li>
           <a href="https://github.com/JamesMMiller/business-ops/blob/main/docs/estate/technical.md">docs/estate/technical.md</a>
-          — secrets map, purchase sequence, fulfilment lanes.
+          — operator reference, purchase sequence, fulfilment lanes.
         </li>
         <li>
           <a href="https://github.com/JamesMMiller/profit-admin/blob/main/docs/architecture.md">profit-admin docs/architecture.md</a>
@@ -428,11 +431,15 @@ flowchart TB
       </footer>
     </div>
     <script src="assets/site.js"></script>
-    <script type="module">
-      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+    <script
+      src="https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.min.js"
+      integrity="sha384-EOXBFmc3gx5mb+vn0vPvvGqACToJD24hhacX5Yx+8NUUQrHIle/Qi5Bg9o3zKwW2"
+      crossorigin="anonymous"
+    ></script>
+    <script>
       const theme = document.documentElement.dataset.theme === "light" ? "neutral" : "dark";
       mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme });
-      await mermaid.run({ querySelector: ".mermaid" });
+      mermaid.run({ querySelector: ".mermaid" });
     </script>
   </body>
 </html>
