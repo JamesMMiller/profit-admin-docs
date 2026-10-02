@@ -29,6 +29,7 @@ jobs:
         run: |
           mkdir -p _site
           cp index.html architecture.html start.html .nojekyll README.md _site/
+          if [ -f mail.html ]; then cp mail.html _site/; fi
           cp -R assets _site/assets
       - uses: actions/upload-pages-artifact@v3
         with:
